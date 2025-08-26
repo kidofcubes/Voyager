@@ -1,27 +1,31 @@
+import os
+
 from voyager.prompts import load_prompt
 from voyager.utils.json_utils import fix_and_parse_json
-from langchain.chat_models import ChatOpenAI
+# from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 
 
 class CriticAgent:
     def __init__(
         self,
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        request_timout=120,
+        # model_name="gpt-3.5-turbo",
+        # temperature=0,
+        llm,
+        llm_invoker,
+        use_pre_planning_prompt=True,
+        # request_timout=120,
         mode="auto",
     ):
-        self.llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=temperature,
-            request_timeout=request_timout,
-        )
+        self.use_pre_planning_prompt = use_pre_planning_prompt
+        self.llm_invoker=llm_invoker
+        self.llm = llm
         assert mode in ["auto", "manual"]
         self.mode = mode
 
     def render_system_message(self):
-        system_message = SystemMessage(content=load_prompt("critic"))
+        system_message = SystemMessage(content=load_prompt("critic"+("" if self.use_pre_planning_prompt else "_no_pre_planning")))
         return system_message
 
     def render_human_message(self, *, events, task, context, chest_observation):
@@ -98,7 +102,7 @@ class CriticAgent:
         if messages[1] is None:
             return False, ""
 
-        critic = self.llm(messages).content
+        critic = self.llm_invoker(self.llm,(messages)).content
         print(f"\033[31m****Critic Agent ai message****\n{critic}\033[0m")
         try:
             response = fix_and_parse_json(critic)

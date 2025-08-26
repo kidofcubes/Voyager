@@ -1,0 +1,14 @@
+Code:
+```javascript
+// Do not implement any of the functions already given.
+// 不要实现任何已经给出的功能
+// Don't use helper functions unless absolutely nessacary.
+// Make sure to place any helper functions first.
+// ...
+
+// 不要在函数之外编写任何代码
+// main function after the helper functions, make sure to place the main function last, and name it after the task.
+async function yourMainFunctionName(bot) {
+    // ...
+}
+```

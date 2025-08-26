@@ -6,10 +6,13 @@ Plan:
 ...
 Code:
 ```javascript
-// helper functions (only if needed, try to avoid them)
-...
-// main function after the helper functions
+// Do not implement any of the functions already given.
+// place helper functions here (only if needed, try to avoid them)
+// Make sure to place the helper functions first.
+// ...
+
+// main function after the helper functions, make sure to place the main function last.
 async function yourMainFunctionName(bot) {
-  // ...
+    // ...
 }
 ```

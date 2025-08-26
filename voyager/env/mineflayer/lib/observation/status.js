@@ -25,9 +25,7 @@ class Status extends Observation {
             isInWeb: this.bot.entity.isInWeb,
             isCollidedHorizontally: this.bot.entity.isCollidedHorizontally,
             isCollidedVertically: this.bot.entity.isCollidedVertically,
-            biome: this.bot.blockAt(this.bot.entity.position)
-                ? this.bot.blockAt(this.bot.entity.position).biome.name
-                : "None",
+            biome: this.bot.registry.biomes[this.bot.world.getBiome(this.bot.entity.position)].name,
             entities: this.getEntities(),
             timeOfDay: this.getTime(),
             inventoryUsed: this.bot.inventoryUsed(),

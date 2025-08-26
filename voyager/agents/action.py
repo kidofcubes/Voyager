@@ -1,9 +1,9 @@
 import re
 import time
+import os
 
 import voyager.utils as U
 from javascript import require
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import SystemMessagePromptTemplate
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
@@ -14,14 +14,19 @@ from voyager.control_primitives_context import load_control_primitives_context
 class ActionAgent:
     def __init__(
         self,
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        request_timout=120,
+        llm,
+        llm_invoker,
+        # model_name="gpt-3.5-turbo",
+        # temperature=0,
+        # request_timout=120,
         ckpt_dir="ckpt",
+        use_pre_planning_prompt=True,
         resume=False,
         chat_log=True,
         execution_error=True,
     ):
+        self.use_pre_planning_prompt = use_pre_planning_prompt
+        self.llm_invoker=llm_invoker
         self.ckpt_dir = ckpt_dir
         self.chat_log = chat_log
         self.execution_error = execution_error
@@ -31,11 +36,7 @@ class ActionAgent:
             self.chest_memory = U.load_json(f"{ckpt_dir}/action/chest_memory.json")
         else:
             self.chest_memory = {}
-        self.llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=temperature,
-            request_timeout=request_timout,
-        )
+        self.llm = llm
 
     def update_chest_memory(self, chests):
         for position, chest in chests.items():
@@ -73,7 +74,7 @@ class ActionAgent:
             return f"Chests: None\n\n"
 
     def render_system_message(self, skills=[]):
-        system_template = load_prompt("action_template")
+        system_template = load_prompt("action_template"+("" if self.use_pre_planning_prompt else "_no_pre_planning"))
         # FIXME: Hardcoded control_primitives
         base_skills = [
             "exploreUntil",
@@ -89,7 +90,7 @@ class ActionAgent:
                 "mineflayer",
             ]
         programs = "\n\n".join(load_control_primitives_context(base_skills) + skills)
-        response_format = load_prompt("action_response_format")
+        response_format = load_prompt("action_response_format"+("" if self.use_pre_planning_prompt else "_no_pre_planning"))
         system_message_prompt = SystemMessagePromptTemplate.from_template(
             system_template
         )

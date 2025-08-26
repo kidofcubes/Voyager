@@ -2,40 +2,42 @@ from __future__ import annotations
 
 import random
 import re
+import os
 
 import voyager.utils as U
 from voyager.prompts import load_prompt
 from voyager.utils.json_utils import fix_and_parse_json
-from langchain.chat_models import ChatOpenAI
-from langchain.embeddings.openai import OpenAIEmbeddings
+# from langchain.chat_models import ChatOpenAI
+from langchain_chroma import Chroma
+from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
-from langchain.vectorstores import Chroma
 
 
 class CurriculumAgent:
     def __init__(
         self,
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        qa_model_name="gpt-3.5-turbo",
-        qa_temperature=0,
-        request_timout=120,
+        # model_name="gpt-3.5-turbo",
+        # temperature=0,
+        # qa_model_name="gpt-3.5-turbo",
+        # qa_temperature=0,
+        llm,
+        qa_llm,
+        embedding_function,
+        llm_invoker,
+        use_pre_planning_prompt = True,
+        qa_use_pre_planning_prompt = True,
+        # request_timout=120,
         ckpt_dir="ckpt",
         resume=False,
         mode="auto",
         warm_up=None,
         core_inventory_items: str | None = None,
     ):
-        self.llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=temperature,
-            request_timeout=request_timout,
-        )
-        self.qa_llm = ChatOpenAI(
-            model_name=qa_model_name,
-            temperature=qa_temperature,
-            request_timeout=request_timout,
-        )
+        self.llm = llm
+        self.qa_llm = qa_llm
+        self.use_pre_planning_prompt = use_pre_planning_prompt
+        self.qa_use_pre_planning_prompt = qa_use_pre_planning_prompt
+        self.llm_invoker=llm_invoker
         assert mode in [
             "auto",
             "manual",
@@ -57,7 +59,7 @@ class CurriculumAgent:
         # vectordb for qa cache
         self.qa_cache_questions_vectordb = Chroma(
             collection_name="qa_cache_questions_vectordb",
-            embedding_function=OpenAIEmbeddings(),
+            embedding_function=embedding_function,
             persist_directory=f"{ckpt_dir}/curriculum/vectordb",
         )
         assert self.qa_cache_questions_vectordb._collection.count() == len(
@@ -132,7 +134,7 @@ class CurriculumAgent:
         return len(self.completed_tasks)
 
     def render_system_message(self):
-        system_message = SystemMessage(content=load_prompt("curriculum"))
+        system_message = SystemMessage(content=load_prompt("curriculum"+("" if self.use_pre_planning_prompt else "_no_pre_planning")))
         assert isinstance(system_message, SystemMessage)
         return system_message
 
@@ -152,8 +154,7 @@ class CurriculumAgent:
         inventory = event["inventory"]
 
         if not any(
-            "dirt" in block
-            or "log" in block
+            "log" in block
             or "grass" in block
             or "sand" in block
             or "snow" in block
@@ -292,7 +293,7 @@ class CurriculumAgent:
     def propose_next_ai_task(self, *, messages, max_retries=5):
         if max_retries == 0:
             raise RuntimeError("Max retries reached, failed to propose ai task.")
-        curriculum = self.llm(messages).content
+        curriculum = self.llm_invoker(self.llm,(messages)).content
         print(f"\033[31m****Curriculum Agent ai message****\n{curriculum}\033[0m")
         try:
             response = self.parse_ai_message(curriculum)
@@ -369,7 +370,7 @@ class CurriculumAgent:
     def decompose_task(self, task, events):
         messages = [
             SystemMessage(
-                content=load_prompt("curriculum_task_decomposition"),
+                content=load_prompt("curriculum_task_decomposition"+("" if self.use_pre_planning_prompt else "_no_pre_planning")),
             ),
             self.render_human_message(events=events, chest_observation=""),
             HumanMessage(content=f"Final task: {task}"),
@@ -377,7 +378,7 @@ class CurriculumAgent:
         print(
             f"\033[31m****Curriculum Agent task decomposition****\nFinal task: {task}\033[0m"
         )
-        response = self.llm(messages).content
+        response = self.llm_invoker(self.llm,(messages)).content
         print(f"\033[31m****Curriculum Agent task decomposition****\n{response}\033[0m")
         return fix_and_parse_json(response)
 
@@ -408,7 +409,6 @@ class CurriculumAgent:
                 texts=[question],
             )
             U.dump_json(self.qa_cache, f"{self.ckpt_dir}/curriculum/qa_cache.json")
-            self.qa_cache_questions_vectordb.persist()
             questions.append(question)
             answers.append(answer)
         assert len(questions_new) == len(questions) == len(answers)
@@ -429,12 +429,11 @@ class CurriculumAgent:
                 texts=[question],
             )
             U.dump_json(self.qa_cache, f"{self.ckpt_dir}/curriculum/qa_cache.json")
-            self.qa_cache_questions_vectordb.persist()
         context = f"Question: {question}\n{answer}"
         return context
 
     def render_system_message_qa_step1_ask_questions(self):
-        return SystemMessage(content=load_prompt("curriculum_qa_step1_ask_questions"))
+        return SystemMessage(content=load_prompt("curriculum_qa_step1_ask_questions"+("" if self.qa_use_pre_planning_prompt else "_no_pre_planning")))
 
     def render_human_message_qa_step1_ask_questions(self, *, events, chest_observation):
         observation = self.render_observation(
@@ -459,7 +458,7 @@ class CurriculumAgent:
                 events=events, chest_observation=chest_observation
             ),
         ]
-        qa_response = self.qa_llm(messages).content
+        qa_response = self.llm_invoker(self.qa_llm,(messages)).content
         try:
             # Regex pattern to extract question and concept pairs
             pattern = r"Question \d+: (.+)\nConcept \d+: (.+)"
@@ -480,7 +479,7 @@ class CurriculumAgent:
 
     def render_system_message_qa_step2_answer_questions(self):
         return SystemMessage(
-            content=load_prompt("curriculum_qa_step2_answer_questions")
+            content=load_prompt("curriculum_qa_step2_answer_questions"+("" if self.use_pre_planning_prompt else "_no_pre_planning"))
         )
 
     def render_human_message_qa_step2_answer_questions(self, question):
@@ -493,6 +492,6 @@ class CurriculumAgent:
             self.render_human_message_qa_step2_answer_questions(question=question),
         ]
         print(f"\033[35mCurriculum Agent Question: {question}\033[0m")
-        qa_answer = self.qa_llm(messages).content
+        qa_answer = self.llm_invoker(self.qa_llm,(messages)).content
         print(f"\033[31mCurriculum Agent {qa_answer}\033[0m")
         return qa_answer
