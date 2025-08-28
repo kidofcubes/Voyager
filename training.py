@@ -1,6 +1,7 @@
 from voyager import Voyager
 from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAIEmbeddings
+from langchain_core.messages import AIMessage
 from langchain_huggingface.embeddings import HuggingFaceEndpointEmbeddings
 import copy
 import os
@@ -66,7 +67,7 @@ request_timeout = 300 #model request_timeout
 #     model="", #unused if llamacpp
 #     request_timeout=request_timeout,
 # )
-embeddings = HuggingFaceEndpointEmbeddings(
+embedding_function = HuggingFaceEndpointEmbeddings(
     model="Qwen/Qwen3-Embedding-8B",
     provider="nebius",
     # huggingfacehub_api_token=os.environ["HUGGINGFACEHUB_API_TOKEN"]
