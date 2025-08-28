@@ -4,14 +4,17 @@ Plan:
 2) ...
 3) ...
 ...
+
 Code:
 ```javascript
 // Do not implement any of the functions already given.
-// place helper functions here (only if needed, try to avoid them)
-// Make sure to place the helper functions first.
+// 不要实现任何已经给出的功能
+// Don't use helper functions unless absolutely nessacary.
+// Make sure to place any helper functions first.
 // ...
 
-// main function after the helper functions, make sure to place the main function last.
+// 不要在函数之外编写任何代码
+// main function after the helper functions, make sure to place the main function last, and name it after the task.
 async function yourMainFunctionName(bot) {
     // ...
 }
